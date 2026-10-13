@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Paste this into Firebase console → Firestore Database → Rules → Publish.
+// Put every partner's login email in the list below (lowercase).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isPartner() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'partner@example.com'
+        ];
+    }
+
+    // Catalogue and shop settings: anyone can read, only partners can change.
+    match /products/{id} {
+      allow read: if true;
+      allow write: if isPartner();
+    }
+    match /store/{id} {
+      allow read: if true;
+      allow write: if isPartner();
+    }
+
+    // Orders: customers can place one and look it up by its order number.
+    // Only partners can list all orders or change them.
+    match /orders/{id} {
+      allow get: if true;
+      allow list, update, delete: if isPartner();
+      allow create: if request.resource.data.id == id
+        && request.resource.data.status == 'placed'
+        && request.resource.data.stockApplied == false
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.items.size() <= 30
+        && request.resource.data.total is number
+        && request.resource.data.customer.phone is string;
+    }
+  }
+}
